@@ -56,12 +56,18 @@ public class UserServiceImpl implements UserService {
                 .subject("Account Created Successfully!")
                 .messageBody(String.format("""
                         Hello user,
+                        
                         Your account is created successfully to our bank.
                         Here is your details, please save this email.
                         Note down the details and keep the details safe.
-                        Name: %s %n
+                        
+                        Name: %s
                         Account Number: %s
                         Account Activation Date: %s
+                        
+                        Thank you for using our service.
+                        Regards,
+                        FinSecure
                         """, accountName, savedUser.getAccountNumber(), savedUser.getCreatedOn()))
                 .build();
         emailService.sendEmailAlert(emailDetails);
