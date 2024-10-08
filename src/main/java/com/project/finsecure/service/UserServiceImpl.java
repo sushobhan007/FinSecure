@@ -1,10 +1,7 @@
 package com.project.finsecure.service;
 
 
-import com.project.finsecure.dto.AccountInfo;
-import com.project.finsecure.dto.BankResponse;
-import com.project.finsecure.dto.EmailDetails;
-import com.project.finsecure.dto.UserRequest;
+import com.project.finsecure.dto.*;
 import com.project.finsecure.entity.User;
 import com.project.finsecure.repository.UserRepository;
 import com.project.finsecure.utils.AccountUtility;
@@ -38,7 +35,7 @@ public class UserServiceImpl implements UserService {
                 .stateOfOrigin(userRequest.getStateOfOrigin())
                 .accountNumber(AccountUtility.generateAccountNumber())
                 .accountBalance(BigDecimal.ZERO)
-                .email(userRequest.getEmail())
+                .email(userRequest.getEmail().toLowerCase())
                 .phoneNumber(userRequest.getPhoneNumber())
                 .alternativePhoneNumber(userRequest.getAlternativePhoneNumber())
                 .status("ACTIVE")
@@ -46,9 +43,7 @@ public class UserServiceImpl implements UserService {
 
         User savedUser = userRepository.save(newUser);
 
-        String accountName = savedUser.getFirstName().trim() + " " +
-                savedUser.getMiddleName().trim() + " " +
-                savedUser.getLastName().trim();
+        String accountName = getUserFullName(savedUser);
 
         //Send Email Alert
         EmailDetails emailDetails = EmailDetails.builder()
@@ -74,7 +69,7 @@ public class UserServiceImpl implements UserService {
 
         return BankResponse.builder()
                 .responseCode(AccountUtility.ACCOUNT_CREATION_SUCCESS)
-                .responseMessage(AccountUtility.ACCOUNT_CREATION_MESSAGE)
+                .responseMessage(AccountUtility.ACCOUNT_CREATION_SUCCESS_MESSAGE)
                 .accountInfo(
                         AccountInfo.builder()
                                 .accountNumber(savedUser.getAccountNumber())
@@ -83,5 +78,46 @@ public class UserServiceImpl implements UserService {
                                 .build()
                 )
                 .build();
+    }
+
+    @Override
+    public BankResponse balanceEnquiry(EnquiryRequest enquiryRequest) {
+        Boolean isAccountExist = userRepository.existsByAccountNumber(enquiryRequest.getAccountNumber());
+        if (!isAccountExist) {
+            return BankResponse.builder()
+                    .responseCode(AccountUtility.ACCOUNT_NOT_EXISTS)
+                    .responseMessage(AccountUtility.ACCOUNT_NOT_EXISTS_MESSAGE)
+                    .accountInfo(null)
+                    .build();
+        }
+
+        User user = userRepository.findByAccountNumber(enquiryRequest.getAccountNumber());
+        return BankResponse.builder()
+                .responseCode(AccountUtility.ACCOUNT_FOUND)
+                .responseMessage(AccountUtility.ACCOUNT_FOUND_MESSAGE)
+                .accountInfo(
+                        AccountInfo.builder()
+                                .accountName(getUserFullName(user))
+                                .accountNumber(user.getAccountNumber())
+                                .accountBalance(user.getAccountBalance())
+                                .build()
+                )
+                .build();
+    }
+
+    @Override
+    public String nameEnquiry(EnquiryRequest enquiryRequest) {
+        Boolean isAccountExist = userRepository.existsByAccountNumber(enquiryRequest.getAccountNumber());
+        if (!isAccountExist) {
+            return AccountUtility.ACCOUNT_NOT_EXISTS_MESSAGE;
+        }
+        User user = userRepository.findByAccountNumber(enquiryRequest.getAccountNumber());
+        return getUserFullName(user);
+    }
+
+    private String getUserFullName(User user) {
+        return user.getFirstName().trim() + " " +
+                user.getMiddleName().trim() + " " +
+                user.getLastName().trim();
     }
 }
