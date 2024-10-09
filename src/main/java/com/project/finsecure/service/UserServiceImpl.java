@@ -64,6 +64,8 @@ public class UserServiceImpl implements UserService {
         userToCredit.setAccountBalance(userToCredit.getAccountBalance().add(creditDebitRequest.getAmount()));
         userRepository.save(userToCredit);
 
+        sendAccountCreditEmail(userToCredit, creditDebitRequest.getAmount());
+
         return buildSuccessResponse(AccountUtility.ACCOUNT_CREDITED_SUCCESS,
                 AccountUtility.ACCOUNT_CREDITED_SUCCESS_MESSAGE,
                 userToCredit);
@@ -83,6 +85,8 @@ public class UserServiceImpl implements UserService {
 
         userToDebit.setAccountBalance(userToDebit.getAccountBalance().subtract(creditDebitRequest.getAmount()));
         userRepository.save(userToDebit);
+
+        sendAccountDebitEmail(userToDebit, creditDebitRequest.getAmount());
 
         return buildSuccessResponse(AccountUtility.ACCOUNT_DEBITED_SUCCESS,
                 AccountUtility.ACCOUNT_DEBITED_SUCCESS_MESSAGE,
@@ -134,6 +138,54 @@ public class UserServiceImpl implements UserService {
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(savedUser.getEmail())
                 .subject("Account Created Successfully!")
+                .messageBody(emailBody)
+                .build();
+
+        emailService.sendEmailAlert(emailDetails);
+    }
+
+    private void sendAccountDebitEmail(User savedUser, BigDecimal amount) {
+        String accountName = getUserFullName(savedUser);
+        String emailBody = String.format("""
+                Hello %s,
+                                
+                We wish to inform you that INR %s has been debited from your A/C No. %s on %s 
+                                
+                Please call customer care if this transaction is not initiated by you.
+                                
+                Thank you for using our service.
+                                
+                Regards,
+                FinSecure
+                """, accountName, amount, savedUser.getAccountNumber(), savedUser.getCreatedOn());
+
+        EmailDetails emailDetails = EmailDetails.builder()
+                .recipient(savedUser.getEmail())
+                .subject("Debit Notification Alert!")
+                .messageBody(emailBody)
+                .build();
+
+        emailService.sendEmailAlert(emailDetails);
+    }
+
+    private void sendAccountCreditEmail(User savedUser, BigDecimal amount) {
+        String accountName = getUserFullName(savedUser);
+        String emailBody = String.format("""
+                Hello %s,
+                                
+                INR %s has been credited to A/C No. %s on %s. 
+                                
+                For any concerns regarding this transaction, please call customer care.
+                                
+                Always open to help you.
+                                
+                Regards,
+                FinSecure
+                """, accountName, amount, savedUser.getAccountNumber(), savedUser.getCreatedOn());
+
+        EmailDetails emailDetails = EmailDetails.builder()
+                .recipient(savedUser.getEmail())
+                .subject("Credit Notification from FinSecure!")
                 .messageBody(emailBody)
                 .build();
 
