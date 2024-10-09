@@ -51,15 +51,15 @@ public class UserServiceImpl implements UserService {
                 .subject("Account Created Successfully!")
                 .messageBody(String.format("""
                         Hello user,
-                        
+                                                
                         Your account is created successfully to our bank.
                         Here is your details, please save this email.
                         Note down the details and keep the details safe.
-                        
+                                                
                         Name: %s
                         Account Number: %s
                         Account Activation Date: %s
-                        
+                                                
                         Thank you for using our service.
                         Regards,
                         FinSecure
@@ -84,11 +84,7 @@ public class UserServiceImpl implements UserService {
     public BankResponse balanceEnquiry(EnquiryRequest enquiryRequest) {
         Boolean isAccountExist = userRepository.existsByAccountNumber(enquiryRequest.getAccountNumber());
         if (!isAccountExist) {
-            return BankResponse.builder()
-                    .responseCode(AccountUtility.ACCOUNT_NOT_EXISTS)
-                    .responseMessage(AccountUtility.ACCOUNT_NOT_EXISTS_MESSAGE)
-                    .accountInfo(null)
-                    .build();
+            return AccountUtility.accountNotExistResponse();
         }
 
         User user = userRepository.findByAccountNumber(enquiryRequest.getAccountNumber());
@@ -113,6 +109,29 @@ public class UserServiceImpl implements UserService {
         }
         User user = userRepository.findByAccountNumber(enquiryRequest.getAccountNumber());
         return getUserFullName(user);
+    }
+
+    @Override
+    public BankResponse creditAccount(CreditDebitRequest creditDebitRequest) {
+        Boolean isAccountExist = userRepository.existsByAccountNumber(creditDebitRequest.getAccountNumber());
+        if (!isAccountExist) {
+            return AccountUtility.accountNotExistResponse();
+        }
+        User userToCredit = userRepository.findByAccountNumber(creditDebitRequest.getAccountNumber());
+        userToCredit.setAccountBalance(userToCredit.getAccountBalance().add(creditDebitRequest.getAmount()));
+        userRepository.save(userToCredit);
+
+        return BankResponse.builder()
+                .responseCode(AccountUtility.ACCOUNT_CREDITED_SUCCESS)
+                .responseMessage(AccountUtility.ACCOUNT_CREDITED_SUCCESS_MESSAGE)
+                .accountInfo(
+                        AccountInfo.builder()
+                                .accountName(getUserFullName(userToCredit))
+                                .accountNumber(userToCredit.getAccountNumber())
+                                .accountBalance(userToCredit.getAccountBalance())
+                                .build()
+                )
+                .build();
     }
 
     private String getUserFullName(User user) {
