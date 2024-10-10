@@ -93,12 +93,52 @@ public class UserServiceImpl implements UserService {
                 userToDebit);
     }
 
+    @Override
+    public BankResponse transfer(TransferRequest transferRequest) {
+
+        //get the account to credit
+
+        Boolean sourceAccountExists = userRepository.existsByAccountNumber(transferRequest.getSourceAccountNumber());
+
+        //get the account to debit (check if account exists)
+        Boolean destinationAccountExists = userRepository.existsByAccountNumber(transferRequest.getDestinationAccountNumber());
+        if (!destinationAccountExists || !sourceAccountExists) {
+            return AccountUtility.accountNotExistResponse();
+        }
+        User sourceAccountUser = userRepository.findByAccountNumber(transferRequest.getSourceAccountNumber());
+
+        //check if debit amount is not more than the current amount
+        if (sourceAccountUser.getAccountBalance().compareTo(transferRequest.getAmount()) < 0) {
+            return buildErrorResponse(AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE,
+                    AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE_MESSAGE);
+        }
+
+        //debit the amount
+        sourceAccountUser.setAccountBalance(sourceAccountUser.getAccountBalance().subtract(transferRequest.getAmount()));
+        userRepository.save(sourceAccountUser);
+
+        //credit the account
+        User destinationAccountUser = userRepository.findByAccountNumber(transferRequest.getDestinationAccountNumber());
+        destinationAccountUser.setAccountBalance(destinationAccountUser.getAccountBalance().add(transferRequest.getAmount()));
+        userRepository.save(destinationAccountUser);
+
+        sendAccountDebitEmail(sourceAccountUser, transferRequest.getAmount());
+        sendAccountCreditEmail(destinationAccountUser, transferRequest.getAmount());
+
+        return buildSuccessResponse(AccountUtility.TRANSFER_SUCCESS,
+                AccountUtility.TRANSFER_SUCCESS_MESSAGE,
+                null);
+    }
+
     private User getUserByAccountNumber(String accountNumber) {
         return userRepository.findByAccountNumber(accountNumber);
     }
 
     private String getUserFullName(User user) {
-        return String.join(" ", user.getFirstName().trim(), user.getMiddleName().trim(), user.getLastName().trim());
+        return String.join(" ",
+                user.getFirstName().trim(),
+                user.getMiddleName().trim(),
+                user.getLastName().trim());
     }
 
     private User buildNewUser(UserRequest userRequest) {
@@ -201,16 +241,15 @@ public class UserServiceImpl implements UserService {
     }
 
     private BankResponse buildSuccessResponse(String responseCode, String responseMessage, User user) {
+        AccountInfo accountInfo = user == null ? null : AccountInfo.builder()
+                .accountName(getUserFullName(user))
+                .accountNumber(user.getAccountNumber())
+                .accountBalance(user.getAccountBalance())
+                .build();
         return BankResponse.builder()
                 .responseCode(responseCode)
                 .responseMessage(responseMessage)
-                .accountInfo(
-                        AccountInfo.builder()
-                                .accountName(getUserFullName(user))
-                                .accountNumber(user.getAccountNumber())
-                                .accountBalance(user.getAccountBalance())
-                                .build()
-                )
+                .accountInfo(accountInfo)
                 .build();
     }
 }

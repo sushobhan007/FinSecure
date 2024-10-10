@@ -1,10 +1,7 @@
 package com.project.finsecure.controller;
 
 
-import com.project.finsecure.dto.BankResponse;
-import com.project.finsecure.dto.CreditDebitRequest;
-import com.project.finsecure.dto.EnquiryRequest;
-import com.project.finsecure.dto.UserRequest;
+import com.project.finsecure.dto.*;
 import com.project.finsecure.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -38,6 +35,11 @@ public class UserController {
     @PostMapping("/accounts/debit")
     public BankResponse debitAccount(@RequestBody CreditDebitRequest creditDebitRequest) {
         return userService.debitAccount(creditDebitRequest);
+    }
+
+    @PostMapping("/accounts/transfer")
+    public BankResponse transfer(@RequestBody TransferRequest transferRequest) {
+        return userService.transfer(transferRequest);
     }
 
 }
