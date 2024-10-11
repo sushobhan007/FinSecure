@@ -20,6 +20,9 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    TransactionService transactionService;
+
     @Override
     public BankResponse createAccount(UserRequest userRequest) {
         if (userRepository.existsByEmail(userRequest.getEmail())) {
@@ -67,6 +70,9 @@ public class UserServiceImpl implements UserService {
         userToCredit.setAccountBalance(userToCredit.getAccountBalance().add(creditDebitRequest.getAmount()));
         userRepository.save(userToCredit);
 
+        //save transaction
+        saveTransaction(userToCredit, creditDebitRequest, "CREDIT");
+
         EmailUtility.sendAccountCreditEmail(userToCredit, creditDebitRequest.getAmount(), emailService);
 
         return ResponseUtility.buildSuccessResponse(AccountUtility.ACCOUNT_CREDITED_SUCCESS,
@@ -88,6 +94,9 @@ public class UserServiceImpl implements UserService {
 
         userToDebit.setAccountBalance(userToDebit.getAccountBalance().subtract(creditDebitRequest.getAmount()));
         userRepository.save(userToDebit);
+
+        //save transaction
+        saveTransaction(userToDebit, creditDebitRequest, "DEBIT");
 
         EmailUtility.sendAccountDebitEmail(userToDebit, creditDebitRequest.getAmount(), emailService);
 
@@ -120,10 +129,16 @@ public class UserServiceImpl implements UserService {
         sourceAccountUser.setAccountBalance(sourceAccountUser.getAccountBalance().subtract(transferRequest.getAmount()));
         userRepository.save(sourceAccountUser);
 
+//        //save debit transaction
+//        saveTransaction(userToDebit, creditDebitRequest, "DEBIT");
+
         //credit the account
         User destinationAccountUser = userRepository.findByAccountNumber(transferRequest.getDestinationAccountNumber());
         destinationAccountUser.setAccountBalance(destinationAccountUser.getAccountBalance().add(transferRequest.getAmount()));
         userRepository.save(destinationAccountUser);
+
+//        //save credit transaction
+//        saveTransaction(userToCredit, creditDebitRequest, "CREDIT");
 
         EmailUtility.sendAccountDebitEmail(sourceAccountUser, transferRequest.getAmount(), emailService);
         EmailUtility.sendAccountCreditEmail(destinationAccountUser, transferRequest.getAmount(), emailService);
@@ -152,5 +167,15 @@ public class UserServiceImpl implements UserService {
                 .alternativePhoneNumber(userRequest.getAlternativePhoneNumber())
                 .status("ACTIVE")
                 .build();
+    }
+
+    void saveTransaction(User user, CreditDebitRequest request, String transactionType) {
+        //save transaction
+        TransactionDetails creditTransaction = TransactionDetails.builder()
+                .accountNumber(user.getAccountNumber())
+                .transactionType(transactionType)
+                .amount(request.getAmount())
+                .build();
+        transactionService.saveTransaction(creditTransaction);
     }
 }
