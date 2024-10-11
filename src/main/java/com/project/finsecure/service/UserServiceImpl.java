@@ -4,6 +4,9 @@ import com.project.finsecure.dto.*;
 import com.project.finsecure.entity.User;
 import com.project.finsecure.repository.UserRepository;
 import com.project.finsecure.utils.AccountUtility;
+import com.project.finsecure.utils.EmailUtility;
+import com.project.finsecure.utils.ResponseUtility;
+import com.project.finsecure.utils.UserUtility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,17 +24,17 @@ public class UserServiceImpl implements UserService {
     public BankResponse createAccount(UserRequest userRequest) {
         if (userRepository.existsByEmail(userRequest.getEmail())) {
             System.out.println("Account already exists for the email: " + userRequest.getEmail());
-            return buildErrorResponse(AccountUtility.ACCOUNT_EXISTS_CODE,
+            return ResponseUtility.buildErrorResponse(AccountUtility.ACCOUNT_EXISTS_CODE,
                     AccountUtility.ACCOUNT_EXISTS_MESSAGE);
         }
 
         User newUser = buildNewUser(userRequest);
         User savedUser = userRepository.save(newUser);
 
-        sendAccountCreationEmail(savedUser);
+        EmailUtility.sendAccountCreationEmail(savedUser, emailService);
 
         System.out.println("Account created successfully for the user: " + savedUser.getEmail());
-        return buildSuccessResponse(AccountUtility.ACCOUNT_CREATION_SUCCESS,
+        return ResponseUtility.buildSuccessResponse(AccountUtility.ACCOUNT_CREATION_SUCCESS,
                 AccountUtility.ACCOUNT_CREATION_SUCCESS_MESSAGE,
                 savedUser);
     }
@@ -43,7 +46,7 @@ public class UserServiceImpl implements UserService {
             return AccountUtility.accountNotExistResponse();
         }
 
-        return buildSuccessResponse(AccountUtility.ACCOUNT_FOUND,
+        return ResponseUtility.buildSuccessResponse(AccountUtility.ACCOUNT_FOUND,
                 AccountUtility.ACCOUNT_FOUND_MESSAGE,
                 user);
     }
@@ -51,7 +54,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public String nameEnquiry(EnquiryRequest enquiryRequest) {
         User user = getUserByAccountNumber(enquiryRequest.getAccountNumber());
-        return (user == null) ? AccountUtility.ACCOUNT_NOT_EXISTS_MESSAGE : getUserFullName(user);
+        return (user == null) ? AccountUtility.ACCOUNT_NOT_EXISTS_MESSAGE : UserUtility.getUserFullName(user);
     }
 
     @Override
@@ -64,9 +67,9 @@ public class UserServiceImpl implements UserService {
         userToCredit.setAccountBalance(userToCredit.getAccountBalance().add(creditDebitRequest.getAmount()));
         userRepository.save(userToCredit);
 
-        sendAccountCreditEmail(userToCredit, creditDebitRequest.getAmount());
+        EmailUtility.sendAccountCreditEmail(userToCredit, creditDebitRequest.getAmount(), emailService);
 
-        return buildSuccessResponse(AccountUtility.ACCOUNT_CREDITED_SUCCESS,
+        return ResponseUtility.buildSuccessResponse(AccountUtility.ACCOUNT_CREDITED_SUCCESS,
                 AccountUtility.ACCOUNT_CREDITED_SUCCESS_MESSAGE,
                 userToCredit);
     }
@@ -79,16 +82,16 @@ public class UserServiceImpl implements UserService {
         }
 
         if (userToDebit.getAccountBalance().compareTo(creditDebitRequest.getAmount()) < 0) {
-            return buildErrorResponse(AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE,
+            return ResponseUtility.buildErrorResponse(AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE,
                     AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE_MESSAGE);
         }
 
         userToDebit.setAccountBalance(userToDebit.getAccountBalance().subtract(creditDebitRequest.getAmount()));
         userRepository.save(userToDebit);
 
-        sendAccountDebitEmail(userToDebit, creditDebitRequest.getAmount());
+        EmailUtility.sendAccountDebitEmail(userToDebit, creditDebitRequest.getAmount(), emailService);
 
-        return buildSuccessResponse(AccountUtility.ACCOUNT_DEBITED_SUCCESS,
+        return ResponseUtility.buildSuccessResponse(AccountUtility.ACCOUNT_DEBITED_SUCCESS,
                 AccountUtility.ACCOUNT_DEBITED_SUCCESS_MESSAGE,
                 userToDebit);
     }
@@ -108,8 +111,8 @@ public class UserServiceImpl implements UserService {
         User sourceAccountUser = userRepository.findByAccountNumber(transferRequest.getSourceAccountNumber());
 
         //check if debit amount is not more than the current amount
-        if (sourceAccountUser.getAccountBalance().compareTo(transferRequest.getAmount()) < 0) {
-            return buildErrorResponse(AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE,
+        if (transferRequest.getAmount().compareTo(sourceAccountUser.getAccountBalance()) > 0) {
+            return ResponseUtility.buildErrorResponse(AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE,
                     AccountUtility.INSUFFICIENT_ACCOUNT_BALANCE_MESSAGE);
         }
 
@@ -122,23 +125,16 @@ public class UserServiceImpl implements UserService {
         destinationAccountUser.setAccountBalance(destinationAccountUser.getAccountBalance().add(transferRequest.getAmount()));
         userRepository.save(destinationAccountUser);
 
-        sendAccountDebitEmail(sourceAccountUser, transferRequest.getAmount());
-        sendAccountCreditEmail(destinationAccountUser, transferRequest.getAmount());
+        EmailUtility.sendAccountDebitEmail(sourceAccountUser, transferRequest.getAmount(), emailService);
+        EmailUtility.sendAccountCreditEmail(destinationAccountUser, transferRequest.getAmount(), emailService);
 
-        return buildSuccessResponse(AccountUtility.TRANSFER_SUCCESS,
+        return ResponseUtility.buildSuccessResponse(AccountUtility.TRANSFER_SUCCESS,
                 AccountUtility.TRANSFER_SUCCESS_MESSAGE,
                 null);
     }
 
     private User getUserByAccountNumber(String accountNumber) {
         return userRepository.findByAccountNumber(accountNumber);
-    }
-
-    private String getUserFullName(User user) {
-        return String.join(" ",
-                user.getFirstName().trim(),
-                user.getMiddleName().trim(),
-                user.getLastName().trim());
     }
 
     private User buildNewUser(UserRequest userRequest) {
@@ -155,101 +151,6 @@ public class UserServiceImpl implements UserService {
                 .phoneNumber(userRequest.getPhoneNumber())
                 .alternativePhoneNumber(userRequest.getAlternativePhoneNumber())
                 .status("ACTIVE")
-                .build();
-    }
-
-    private void sendAccountCreationEmail(User savedUser) {
-        String accountName = getUserFullName(savedUser);
-        String emailBody = String.format("""
-                Hello user,
-                                
-                Your account has been created successfully at our bank.
-                Here are your details. Please save this email and keep the information safe.
-                                
-                Name: %s
-                Account Number: %s
-                Account Activation Date: %s
-                                
-                Thank you for using our service.
-                Regards,
-                FinSecure
-                """, accountName, savedUser.getAccountNumber(), savedUser.getCreatedOn());
-
-        EmailDetails emailDetails = EmailDetails.builder()
-                .recipient(savedUser.getEmail())
-                .subject("Account Created Successfully!")
-                .messageBody(emailBody)
-                .build();
-
-        emailService.sendEmailAlert(emailDetails);
-    }
-
-    private void sendAccountDebitEmail(User savedUser, BigDecimal amount) {
-        String accountName = getUserFullName(savedUser);
-        String emailBody = String.format("""
-                Hello %s,
-                                
-                We wish to inform you that INR %s has been debited from your A/C No. %s on %s 
-                                
-                Please call customer care if this transaction is not initiated by you.
-                                
-                Thank you for using our service.
-                                
-                Regards,
-                FinSecure
-                """, accountName, amount, savedUser.getAccountNumber(), savedUser.getCreatedOn());
-
-        EmailDetails emailDetails = EmailDetails.builder()
-                .recipient(savedUser.getEmail())
-                .subject("Debit Notification Alert!")
-                .messageBody(emailBody)
-                .build();
-
-        emailService.sendEmailAlert(emailDetails);
-    }
-
-    private void sendAccountCreditEmail(User savedUser, BigDecimal amount) {
-        String accountName = getUserFullName(savedUser);
-        String emailBody = String.format("""
-                Hello %s,
-                                
-                INR %s has been credited to A/C No. %s on %s. 
-                                
-                For any concerns regarding this transaction, please call customer care.
-                                
-                Always open to help you.
-                                
-                Regards,
-                FinSecure
-                """, accountName, amount, savedUser.getAccountNumber(), savedUser.getCreatedOn());
-
-        EmailDetails emailDetails = EmailDetails.builder()
-                .recipient(savedUser.getEmail())
-                .subject("Credit Notification from FinSecure!")
-                .messageBody(emailBody)
-                .build();
-
-        emailService.sendEmailAlert(emailDetails);
-    }
-
-    private BankResponse buildErrorResponse(String responseCode, String responseMessage) {
-        return BankResponse.builder()
-                .responseCode(responseCode)
-                .responseMessage(responseMessage)
-                .accountInfo(null)
-                .build();
-    }
-
-    private BankResponse buildSuccessResponse(String responseCode, String responseMessage, User user) {
-        AccountInfo accountInfo = user == null ? null : AccountInfo.builder()
-                .accountName(getUserFullName(user))
-                .accountNumber(user.getAccountNumber())
-                .accountBalance(user.getAccountBalance())
-                .build();
-        return BankResponse.builder()
-                .responseCode(responseCode)
-                .responseMessage(responseMessage)
-                .accountInfo(accountInfo)
                 .build();
     }
 }
