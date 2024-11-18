@@ -56,25 +56,8 @@ The project follows a **microservice-ready modular design** using the **Spring B
 
 The application uses a relational database structure with two primary tables:
 
-  +---------------------+       +-----------------------+
-  |     Transaction     |       |       User            |
-  +---------------------+       +-----------------------+
-  | transactionId (PK)  |       | id (PK)               |
-  | transactionType     |       | firstName             |
-  | amount              |       | middleName            |
-  | accountNumber       |<----->| accountNumber         |
-  | status              |       | lastName              |
-  +---------------------+       | gender                |
-                                | address               |
-                                | stateOfOrigin         |
-                                | accountBalance        |
-                                | email                 |
-                                | phoneNumber           |
-                                | alternativePhoneNumber|
-                                | status                |
-                                | createdOn             |
-                                | lastUpdated           |
-                                +-----------------------+
+  ![image](https://github.com/user-attachments/assets/d5d93141-f0c5-4e9e-ad8a-e0be79394470)
+
 ---
 
 ## Getting Started
@@ -125,11 +108,5 @@ We welcome contributions! Please follow these steps:
    ```
 3. Commit changes and push to your fork.
 4. Create a pull request.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
 
 ---
