@@ -45,7 +45,7 @@ The project follows a **microservice-ready modular design** using the **Spring B
 ### Key Technologies
 - **Java 17** with **Spring Boot 3.x**
 - **JPA/Hibernate** for ORM
-- **PostgreSQL** (or another relational database)
+- **MySQL** (or another relational database)
 - **Lombok** for clean code and reduced boilerplate
 - **Maven** for dependency management
 - **Docker** for containerization (planned for deployment)
@@ -65,7 +65,7 @@ The application uses a relational database structure with two primary tables:
 ### Prerequisites
 - Java 17 or later
 - Maven 3.8+
-- PostgreSQL (or compatible database)
+- MySQL (or compatible database)
 - Docker (optional for containerization)
 
 ### Steps to Run
